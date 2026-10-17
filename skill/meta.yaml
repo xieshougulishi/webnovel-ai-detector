@@ -1,0 +1,17 @@
+display-name-zh: 网文 AI 痕迹检测（可解释报告）
+version: 1.1.0
+tag-en: Writing
+tag-cn: 写作
+complete-tags-en:
+  - Writing / Novel
+  - Writing / Review
+  - AI Detection
+complete-tags-cn:
+  - 写作 / 小说
+  - 写作 / 评审
+  - AI 检测
+summary-en: Detect AI-generation traces in a Chinese web-novel excerpt and produce a single-file offline visual report — risk interval and band, every finding located to the exact character range with its human baseline and causal explanation, a cost-ranked revision prescription, counter-evidence supporting human authorship, and appeal arguments ready to quote if a platform flagged the work.
+summary-cn: 检测中文网络小说片段中的 AI 生成痕迹，并在动笔评估前先识别「这段是不是已有作品」（名著／教材篇目／他人网文），输出单文件离线可视化报告——页面最顶部醒目提醒是否已有文章，其下才是 AI 痕迹风险区间与档位、逐处判定到精确字符位置并附人类基线与成因机制、按性价比排序的修改处方、支持「这是人写的」的误判对冲证据，以及被平台判定时可直接引用的申诉论据。
+desc-en: An explainable alternative to black-box AI-text detectors such as Tencent ZhiQue, built for web-novel authors. It measures publicly reproducible stylistic statistics (sentence-length burstiness, punctuation entropy, cliché density, template reuse, dialogue texture, paragraph-closure habits, sensory balance) plus reverse "human-voice" signals (half-width punctuation mixed into Chinese, profanity, dialect, sentence particles, writing noise), and scores them with a fully disclosed formula. Every finding carries a precise character range in the source text, the observed value, the human baseline, an explanation of the generating mechanism, and a concrete fix. Output is a self-contained offline HTML report (inline CSS/JS, opens by double-click, printable) plus a plain-text version for terminal or chat delivery and a JSON version for further processing. Five bands (very low / low / medium / high / very high) with an explicit uncertainty interval whose width reflects evidence dispersion and sample length; samples under 300 characters are refused outright, and under 1000 characters get a forced widened interval. Includes genre adaptation that can only loosen baselines, never tighten them, so that formulaic human-written genres (system-panel, cultivation, ancient romance) are not misjudged. Ships with a self-test corpus and expected bands; diagnosis only — it refuses whole-chapter rewriting because laundering AI text with AI makes it read less human and exposes the author to platform penalties.
+desc-cn: 面向网文作者的、朱雀类黑箱检测器的可解释替代方案。**先判出处、再判 AI**：报告生成前由模型判断这段文字是否取自已有作品（名著、教材必背篇目、现当代名篇、网文圈高知名度作品），命中时在页面**最顶部**给出红/黄色醒目横幅，标明作品名、作者、年代、识别置信度与占全文比例，并明确写清「AI 痕迹风险分对已有作品没有意义——名篇大多写于 AI 出现之前，低分只说明是人写的，不能说明是你的」，避免作者拿他人的公版名篇去投稿。已有作品识别靠**模型自身知识 + 数据契约校验**（必填 match/confidence/evidence，`none` 却给 `high` 会被拦截为过度自信，`matched` 必须给具体依据），不做静态指纹库——静态库覆盖不了「流传很广」这个开放集合。AI 检测部分基于**可公开复算的文体统计特征**（句长突发性、标点熵、套话密度、句式模板复用、对白质感、段落闭合习惯、五感分布），叠加**反向人味信号**（混入中文的半角标点、粗话、方言、语气助词、写作噪声），用**完全公开的公式**计分。每一条判定都带：原文精确字符区间、实测值、人类基线、成因机制解释、以及具体改法。输出为**单文件离线可视化 HTML 报告**（CSS/JS 全内联、双击即开、可打印），同时给出终端/聊天可直接阅读的纯文本版与供后续处理的 JSON 版。五档结论（极低/偏低/中等/偏高/极高）附**显式不确定区间**，区间宽度由证据分散度与样本长度决定；低于 300 字直接拒绝下结论，低于 1000 字强制放宽区间。含题材自适应，**只放宽基线、绝不收紧**，避免把人写的系统流、签到流、古言误判。随附两层自检（内联核心样本 + 外部语料）。**只做诊断、拒绝整章代写**——用 AI 掩盖 AI 会让文本更像机器，并把作者推向平台封号。
+source: user

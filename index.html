@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>网文 AI 痕迹检测 · 网页版</title>
+<meta name="description" content="检测中文网文的 AI 含量，逐条列出判定原因：命中的特征、实测值 vs 人类基线、原文位置、修改建议与申诉论据。通用 Agent Skill，附免安装网页版。">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<style>
+  :root{
+    --ink:#1f2328; --ink2:#4b5563; --ink3:#8b93a1;
+    --line:#e6e8ef; --line2:#eef0f5; --bg:#f6f7fa; --card:#fff;
+    --brand:#e0782f; --brand2:#c9651f;
+    --ok:#15803d; --warn:#b45309; --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",
+         "Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px; margin:0 auto; padding:28px 18px 64px}
+  header h1{font-size:24px; margin:0 0 6px; letter-spacing:-.3px}
+  header .ver{
+    display:inline-block; vertical-align:2px; font-size:11.5px; font-weight:600;
+    color:#c2410c; background:#fff3e9; border:1px solid #f3d4c0;
+    border-radius:6px; padding:1px 8px; margin-right:7px; letter-spacing:0;
+  }
+  header .sub{color:var(--ink2); font-size:14.5px; margin:0 0 4px}
+  header .caps{
+    margin:14px 0 0; padding:0; list-style:none;
+    display:grid; grid-template-columns:1fr 1fr; gap:7px 22px;
+    max-width:720px;
+  }
+  header .caps li{
+    position:relative; padding-left:17px; font-size:13px; color:var(--ink2);
+    line-height:1.6;
+  }
+  header .caps li::before{
+    content:""; position:absolute; left:3px; top:8.5px;
+    width:6px; height:6px; border-radius:50%; background:#e8a06a;
+  }
+  header .caps b{color:var(--ink); font-weight:600}
+  @media (max-width:640px){ header .caps{grid-template-columns:1fr} }
+  header .alt{
+    color:var(--ink3); font-size:12.5px; line-height:1.65;
+    margin:14px 0 0; max-width:680px;
+  }
+  .privacy{
+    display:inline-flex; align-items:center; gap:7px;
+    background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;
+    border-radius:999px; padding:4px 12px; font-size:12.5px; margin-top:10px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; margin-top:16px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  textarea, input[type=text]{
+    width:100%; border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; font:inherit; font-size:14px; color:var(--ink);
+    background:#fcfcfd; resize:vertical; outline:none;
+  }
+  textarea:focus, input[type=text]:focus{border-color:var(--brand); background:#fff;
+    box-shadow:0 0 0 3px rgba(224,120,47,.12)}
+  #text{min-height:220px}
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px}
+  .spacer{flex:1}
+  button{
+    font:inherit; font-size:14px; border-radius:10px; padding:9px 18px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+    transition:.15s;
+  }
+  button:hover:not(:disabled){border-color:#cfd4de; background:#fafbfc}
+  button:disabled{opacity:.55; cursor:not-allowed}
+  button.primary{
+    background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600;
+  }
+  button.primary:hover:not(:disabled){background:var(--brand2); border-color:var(--brand2)}
+  .muted{color:var(--ink3); font-size:12.5px}
+  .status{margin-top:12px; font-size:13.5px; min-height:22px; color:var(--ink2)}
+  .status.err{color:var(--danger)}
+  .status.ok{color:var(--ok)}
+  details{margin-top:14px}
+  details summary{cursor:pointer; color:var(--ink2); font-size:13.5px; user-select:none}
+  details[open] summary{margin-bottom:10px}
+  details .field{margin-top:10px}
+  details label{display:block; font-size:13px; color:var(--ink2); margin-bottom:5px}
+  details textarea{min-height:90px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px}
+  .hint{font-size:12px; color:var(--ink3); margin-top:4px}
+  #resultCard{display:none}
+  #resultCard.show{display:block}
+  #frame{
+    width:100%; border:1px solid var(--line); border-radius:12px;
+    background:#fff; height:900px; margin-top:12px;
+  }
+  .verdict{
+    display:flex; gap:14px; align-items:baseline; flex-wrap:wrap;
+    padding:12px 14px; border-radius:10px; background:#fafbfc; border:1px solid var(--line2);
+  }
+  .verdict b{font-size:26px; letter-spacing:-.5px}
+  .verdict .band{font-weight:700; font-size:16px}
+  footer{margin-top:32px; color:var(--ink3); font-size:12.5px; line-height:1.8}
+  footer a{color:var(--ink2)}
+  .loading::after{content:""; animation:dots 1.2s steps(4,end) infinite}
+  @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>网文 AI 痕迹检测</h1>
+    <p class="sub">
+      <span class="ver">Agent Skill</span>
+      检测中文网文的 <b>AI 含量</b>，并<b>逐条列出判定原因</b>——不是只丢给你一个分数。
+    </p>
+
+    <ul class="caps">
+      <li><b>AI 含量风险分</b> + 不确定区间，不假装精确</li>
+      <li><b>命中哪几条特征</b>、落在原文第几个字，可直接跳过去看</li>
+      <li><b>实测值 vs 人类基线</b>：为什么这条算异常，而不是凭感觉</li>
+      <li><b>逐条改法</b>：这个套话换成什么、哪句该删</li>
+      <li><b>逻辑漏洞</b>：自相矛盾 / 答非所问 / 语义跳跃</li>
+      <li><b>申诉材料</b>：被平台判为 AI 时可直接引用的论据</li>
+    </ul>
+
+    <p class="alt">
+      这是一个<b>通用 Agent Skill</b>：装进 Claude Code、DSH 或任何支持 Agent Skills 的客户端即可调用，
+      上述功能全在。本页是它的<b>免安装网页版</b>，跑同一套检测引擎，做量化分析这一部分。
+    </p>
+  </header>
+
+  <section class="card">
+    <textarea id="text" placeholder="把要检测的网文章节粘贴到这里（建议 ≥300 汉字；1000 字以上结论更稳）。"></textarea>
+    <div class="row">
+      <span class="muted" id="counter">0 汉字</span>
+      <span class="spacer"></span>
+      <input type="file" id="file" accept=".txt,.md" style="display:none">
+      <button type="button" id="pick">选择文件</button>
+      <button type="button" id="demo">载入示例</button>
+      <button type="button" id="clear">清空</button>
+      <button type="button" class="primary" id="run" disabled>开始检测</button>
+    </div>
+
+    <details>
+      <summary>高级选项（可选：把已有的模型判断一并计入）</summary>
+      <p class="hint">
+        下面两项需要<b>模型</b>判断，网页版默认关闭——这正是它不消耗额度的原因。
+        如果你在别处（比如直接问对话助手）已经拿到了判断结果，粘进来即可一起计分。
+        留空就当这两项没做，报告里也会如实标注「未做」。
+      </p>
+      <div class="field">
+        <label>逻辑漏洞判断（JSON，可留空）</label>
+        <textarea id="coh" placeholder='{"holes":[{"quote":"原文片段","type":"contradiction","severity":5,"why":"为什么矛盾"}]}'></textarea>
+      </div>
+      <div class="field">
+        <label>已有作品识别（JSON，可留空）</label>
+        <textarea id="exist" placeholder='{"match":"none","confidence":"medium","evidence":["通读未见吻合"]}'></textarea>
+      </div>
+    </details>
+
+    <div class="status" id="status">正在准备分析引擎（首次约 10 MB，之后有缓存）…<span class="loading"></span></div>
+  </section>
+
+  <section class="card" id="resultCard">
+    <div class="verdict">
+      <b id="riskNum">–</b>
+      <span class="band" id="bandTxt"></span>
+      <span class="muted" id="intervalTxt"></span>
+      <span class="spacer"></span>
+      <button type="button" id="download">下载报告 HTML</button>
+    </div>
+    <iframe id="frame" title="检测报告"></iframe>
+  </section>
+
+  <footer>
+    <p><b>它能做什么、不能做什么</b>：这是「AI 用词特征」检测器，擅长抓套话密集、句式模板化、
+    逐字重复、段段升华那一类 AI 写法。对「写得啰嗦」「语义荒谬」的 AI 文本，
+    已知会漏检——这些案例全部记录在 <code>references/calibration.md</code>。</p>
+    <p><b>低分不等于排除 AI。</b> 只表示「没抓到证据」。报告里每一档都写了这句。</p>
+    <p>通用 Agent Skill（附网页版）· 计分公式与词表全部公开，每条判定可复核 · 报告可离线保存</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const PYODIDE_VER = "v0.26.4";
+  const PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/" + PYODIDE_VER + "/full/";
+
+  const $ = (id) => document.getElementById(id);
+  const elText = $("text"), elCounter = $("counter"), elRun = $("run");
+  const elStatus = $("status"), elFrame = $("frame"), elCard = $("resultCard");
+  const elRisk = $("riskNum"), elBand = $("bandTxt"), elInterval = $("intervalTxt");
+
+  let pyodide = null;
+  let ready = false;
+  let lastHtml = "";
+
+  function setStatus(msg, cls) {
+    elStatus.className = "status" + (cls ? " " + cls : "");
+    elStatus.innerHTML = msg;
+  }
+
+  function countHan(s) {
+    const m = s.match(/[\u4e00-\u9fff]/g);
+    return m ? m.length : 0;
+  }
+
+  function refreshCounter() {
+    const n = countHan(elText.value);
+    elCounter.textContent = n + " 汉字";
+    elRun.disabled = !ready || n < 30;
+  }
+
+  elText.addEventListener("input", refreshCounter);
+
+  $("clear").addEventListener("click", () => {
+    elText.value = "";
+    refreshCounter();
+    elCard.classList.remove("show");
+  });
+
+  $("pick").addEventListener("click", () => $("file").click());
+  $("file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    elText.value = await f.text();
+    refreshCounter();
+  });
+
+  // 内置演示文本：项目自行虚构，刻意写成 AI 典型腔，用于让用户先看到报告长什么样
+  const DEMO_TEXT =
+    "暮色沉下来的时候，林间的雾已经浓得化不开了。\n\n" +
+    "少年凭空立在古树之巅，衣袂在风里微微扬起，仿佛一柄尚未出鞘的剑。" +
+    "他微微低垂着眼，一丝若有若无的疲惫浮上眉梢，又很快被那抹淡淡的冷意压了下去。\n\n" +
+    "他缓缓抬起手，指尖有一缕青光流转，轻轻一颤，便在空气中漾开一圈涟漪。\n\n" +
+    "“三年了。”他喃喃道，声音轻得像是要散在风里。\n\n" +
+    "他知道，这一战避无可避。那些藏在迷雾深处的眼睛，此刻正一眨不眨地盯着他。" +
+    "他的心中却没有半分惧怕，反而升起一股奇异的平静——仿佛这一切，早在很久以前就已经注定。\n\n" +
+    "就在这时！\n\n" +
+    "一道黑影毫无预兆地自雾中掠出，快得几乎看不清轨迹！\n\n" +
+    "少年眼神一凛，身形倏然一侧，那道黑影擦着他的衣角掠过，在身后的古树上轰出一个焦黑的窟窿。\n\n" +
+    "“好快的剑。”少年缓缓吐出四个字，脸上浮现出一丝淡淡的惊讶。\n\n" +
+    "雾气缓缓散去，少年依旧静静立着，任凭夜风把他的衣角吹得微微作响。" +
+    "他缓缓睁开眼，眸中那丝淡淡的迷茫已经散尽，取而代之的是一种近乎冷酷的清明。";
+
+  $("demo").addEventListener("click", () => {
+    elText.value = DEMO_TEXT;
+    refreshCounter();
+    elText.focus();
+  });
+
+  $("download").addEventListener("click", () => {
+    if (!lastHtml) return;
+    const blob = new Blob([lastHtml], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "AI痕迹检测报告.html";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  });
+
+  // ---- 启动 Pyodide ----
+  async function boot() {
+    const manifest = await (await fetch("py/manifest.json")).json();
+    setStatus("正在加载 Python 运行时（首次约 10 MB，之后浏览器会缓存）…<span class='loading'></span>");
+    pyodide = await loadPyodide({ indexURL: PYODIDE_URL });
+
+    // 把技能脚本写进虚拟文件系统（保持 scripts/ 与 data/ 平级的真实结构）
+    pyodide.FS.mkdirTree("/app/scripts");
+    pyodide.FS.mkdirTree("/app/data");
+    for (const rel of manifest.files) {
+      const resp = await fetch("py/" + rel);
+      if (!resp.ok) throw new Error("加载失败：" + rel);
+      const text = await resp.text();
+      pyodide.FS.writeFile("/app/" + rel, text, { encoding: "utf8" });
+    }
+    pyodide.runPython("import sys; sys.path.insert(0, '/app'); sys.path.insert(0, '/app/scripts')");
+
+    // 预热：导入一次，暴露后续调用
+    pyodide.runPython("import bridge");
+    ready = true;
+    setStatus("引擎就绪。把稿子粘进来，点「开始检测」。", "ok");
+    refreshCounter();
+
+    // 便于分享「一键看示例」的链接，也用于自动化测试
+    if (location.search.indexOf("demo") >= 0) {
+      $("demo").click();
+      elRun.click();
+    }
+  }
+
+  // ---- 执行检测 ----
+  elRun.addEventListener("click", async () => {
+    if (!ready) return;
+    const text = elText.value.trim();
+    if (countHan(text) < 30) {
+      setStatus("汉字太少（<30），无法给出有意义的结论。", "err");
+      return;
+    }
+    elRun.disabled = true;
+    setStatus("分析中…<span class='loading'></span>");
+    try {
+      pyodide.globals.set("_TEXT", text);
+      pyodide.globals.set("_COH", $("coh").value.trim());
+      pyodide.globals.set("_EXIST", $("exist").value.trim());
+      const raw = pyodide.runPython(
+        "bridge.make_report(_TEXT, '网页检测', _EXIST, _COH)"
+      );
+      const res = JSON.parse(raw);
+      if (!res.ok) {
+        setStatus(res.error || "分析失败", "err");
+        return;
+      }
+      lastHtml = res.html;
+      elFrame.srcdoc = res.html;
+      elRisk.textContent = res.risk;
+      elBand.textContent = res.band;
+      elInterval.textContent =
+        "风险区间 " + res.interval[0] + " – " + res.interval[1] + "（" + res.han + " 汉字）";
+      elCard.classList.add("show");
+      elCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      setStatus("完成。报告已生成，可下载保存。", "ok");
+    } catch (e) {
+      console.error(e);
+      setStatus("出错了：" + (e && e.message ? e.message : e), "err");
+    } finally {
+      refreshCounter();
+    }
+  });
+
+  boot().catch((e) => {
+    console.error(e);
+    setStatus("引擎加载失败：" + (e && e.message ? e.message : e) +
+      "<br>如果长时间失败，可能是网络无法访问 CDN；可换网络或稍后重试。", "err");
+  });
+})();
+</script>
+</body>
+</html>

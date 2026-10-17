@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 痕迹检测报告 · 示例-边界武侠</title>
+<style>
+:root {
+  --bg:#f4f5f8; --paper:#ffffff; --ink:#1f2430; --ink2:#4b5568; --ink3:#7c8598;
+  --line:#e6e8ef; --line2:#d3d7e2;
+  --s1:#94a3b8; --s2:#60a5fa; --s3:#ca8a04; --s4:#ea580c; --s5:#dc2626;
+  --good:#16a34a; --bad:#dc2626; --warn:#ca8a04;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Source Han Sans SC",
+              "Noto Sans CJK SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height:1.75; font-size:15px;
+}
+.wrap { max-width:1080px; margin:0 auto; padding:24px 18px 60px; }
+.hero {
+  background:var(--paper); border:1px solid var(--line); border-radius:16px;
+  padding:26px 28px; display:flex; gap:26px; align-items:center;
+  box-shadow:0 1px 3px rgba(20,26,45,.05); margin-bottom:18px; flex-wrap:wrap;
+}
+.hero-left { flex:1 1 420px; min-width:320px; }
+.hero-right { flex:0 0 360px; max-width:100%; }
+.eyebrow { font-size:12px; letter-spacing:.14em; color:var(--ink3); text-transform:uppercase; }
+h1 { font-size:24px; margin:6px 0 4px; line-height:1.35; word-break:break-all; }
+.sub { font-size:12.5px; color:var(--ink3); }
+.verdict { margin-top:16px; padding:14px 16px; border-radius:12px; background:#fafbfd; border:1px solid var(--line); }
+.v-band { font-size:20px; font-weight:700; }
+.v-text { font-size:14px; color:var(--ink2); margin-top:2px; }
+.v-interval { font-size:13px; color:var(--ink2); margin-top:8px; }
+.v-verylow .v-band { color:var(--good); }
+.v-low .v-band { color:#65a30d; }
+.v-mid .v-band { color:var(--warn); }
+.v-high .v-band { color:var(--s4); }
+.v-veryhigh .v-band { color:var(--bad); }
+.v-unknown .v-band { color:var(--ink3); }
+.gauge { width:100%; height:auto; }
+.tick { font-size:10px; fill:var(--ink3); }
+.gauge-num { font-size:46px; font-weight:800; }
+.gauge-unit { font-size:11px; fill:var(--ink3); letter-spacing:.08em; }
+.gauge-band { font-size:16px; font-weight:700; }
+
+.panel {
+  background:var(--paper); border:1px solid var(--line); border-radius:16px;
+  padding:22px 24px; margin-bottom:18px; box-shadow:0 1px 3px rgba(20,26,45,.05);
+}
+.panel h2 { font-size:17px; margin:0 0 12px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.panel h3 { font-size:15px; margin:20px 0 8px; }
+.grid2 { display:grid; grid-template-columns:1fr 1.25fr; gap:18px; align-items:start; }
+@media (max-width:900px) { .grid2 { grid-template-columns:1fr; } }
+.hint { font-size:12.5px; color:var(--ink3); font-weight:400; }
+.radar { width:100%; height:auto; max-width:440px; display:block; margin:0 auto; overflow:visible; }
+/* 层级：分类名最大最重 → 占比次之 → 贡献最轻。数字一律小于名称。 */
+.radar-label { font-size:11.5px; font-weight:600; fill:#4b5563; }
+.radar-score { font-size:10.5px; font-weight:700; fill:#c2410c; }
+.radar-score-zero { fill:#c3c7d2; font-weight:400; }
+.axis-lbl { font-size:8.5px; fill:#c0c4ce; }
+.radar-pts-v { font-size:10px; font-weight:500; fill:#ea580c; }
+.radar-ring { font-size:9px; fill:#c3c7d2; }
+.radar-risk-ring { font-size:10.5px; font-weight:700; fill:#dc2626; }
+.radar-openness { text-align:center; font-size:13px; color:var(--ink2); margin-top:4px; }
+.radar-legend { text-align:center; font-size:11.5px; color:var(--ink3); margin-top:5px; line-height:1.5; }
+.radar-legend .r0 { display:inline-block; width:7px; height:7px; border:1.4px solid #ea580c;
+  border-radius:50%; background:#fff; vertical-align:middle; margin:0 1px; }
+
+.table-wrap { max-height:560px; overflow:auto; }
+table.quant { width:100%; border-collapse:collapse; font-size:13.5px; }
+table.quant th { text-align:left; font-weight:600; color:var(--ink3); font-size:12px;
+  border-bottom:1px solid var(--line2); padding:6px 8px; position:sticky; top:0; background:var(--paper); }
+table.quant td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+table.quant td.num { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+table.quant td.base { color:var(--ink3); font-size:12.5px; }
+.cell-bad { color:var(--bad); }
+.cell-good { color:var(--good); }
+.cell-warn { color:var(--warn); }
+
+details.card { border:1px solid var(--line); border-left:4px solid var(--s3);
+  border-radius:10px; margin-bottom:10px; background:#fcfcfe; }
+details.card.sev4 { border-left-color:var(--s4); }
+details.card.sev5 { border-left-color:var(--s5); }
+details.card.sev2 { border-left-color:var(--s2); }
+details.card.sev1 { border-left-color:var(--s1); }
+details.card summary { cursor:pointer; padding:11px 14px; display:flex; align-items:center; gap:10px;
+  font-weight:600; font-size:14.5px; list-style:none; }
+details.card summary::-webkit-details-marker { display:none; }
+.sev-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--s3); }
+.sev-dot.sev5 { background:var(--s5); } .sev-dot.sev4 { background:var(--s4); }
+.sev-dot.sev2 { background:var(--s2); } .sev-dot.sev1 { background:var(--s1); }
+.card-title { flex:1 1 auto; }
+.card-cat { font-size:11.5px; color:var(--ink3); font-weight:400;
+  border:1px solid var(--line2); border-radius:20px; padding:1px 8px; }
+.card-score { font-variant-numeric:tabular-nums; color:var(--s4); font-weight:700; }
+.card-body { padding:0 14px 14px; border-top:1px dashed var(--line); }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin:12px 0; }
+.metrics > div { background:#f6f7fb; border-radius:8px; padding:7px 9px; }
+.metrics .k { display:block; font-size:11px; color:var(--ink3); }
+.metrics .v { font-weight:700; font-size:14px; font-variant-numeric:tabular-nums; }
+.metrics .v.bad { color:var(--bad); }
+.lbl { font-size:11.5px; color:var(--ink3); letter-spacing:.05em; margin-top:10px; }
+.why p, .how p { margin:3px 0 0; font-size:14px; }
+.how { background:#f7fbf7; border-radius:8px; padding:8px 11px; margin-top:8px; }
+.how .lbl { margin-top:0; color:var(--good); }
+.quote { font-family:Consolas,"Courier New",monospace; font-size:13px; background:#fff8ef;
+  border-left:3px solid var(--s4); padding:5px 9px; margin:5px 0; border-radius:0 6px 6px 0;
+  word-break:break-all; }
+.quote.muted { color:var(--ink3); border-left-color:var(--line2); background:#f8f9fc; }
+.jump { font-size:11.5px; color:#2563eb; text-decoration:none; margin-left:6px; }
+.calc { font-size:12px; color:var(--ink3); margin-top:10px; font-variant-numeric:tabular-nums; }
+.note { font-size:12.5px; color:var(--warn); margin-top:6px; }
+
+.legend { display:flex; gap:14px; font-size:12px; color:var(--ink3); margin-bottom:10px; flex-wrap:wrap; }
+.legend i { display:inline-block; width:14px; height:3px; border-radius:2px; margin-right:4px;
+  vertical-align:middle; background:var(--s3); }
+.legend i.sev5 { background:var(--s5); } .legend i.sev4 { background:var(--s4); }
+.legend i.sev2 { background:var(--s2); } .legend i.sev1 { background:var(--s1); }
+.doc { background:#fcfcfe; border:1px solid var(--line); border-radius:10px;
+  padding:16px 18px; font-size:15px; line-height:2; max-height:640px; overflow:auto;
+  white-space:normal; }
+mark.mk { background:transparent; border-bottom:3px solid var(--s3);
+  padding-bottom:1px; cursor:help; scroll-margin-top:80px; }
+mark.mk.sev5 { border-bottom-color:var(--s5); background:rgba(220,38,38,.07); }
+mark.mk.sev4 { border-bottom-color:var(--s4); background:rgba(234,88,12,.07); }
+mark.mk.sev2 { border-bottom-color:var(--s2); }
+mark.mk.sev1 { border-bottom-color:var(--s1); }
+mark.mk:target { background:#fffbdc; box-shadow:0 0 0 3px #fffbdc; }
+
+.presc { border:1px solid var(--line); border-radius:10px; padding:11px 14px; margin-bottom:9px; background:#fcfcfe; }
+.presc-head { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.rank { width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff;
+  font-size:11.5px; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.presc-title { font-weight:600; font-size:14px; flex:1 1 auto; }
+.presc-meta { font-size:12px; color:var(--ink3); }
+.presc-body { font-size:13.5px; margin-top:6px; color:var(--ink2); }
+
+.score-line { font-size:14px; margin-bottom:8px; }
+.human-list { margin:0; padding-left:20px; font-size:13.5px; }
+.human-list li { margin-bottom:7px; }
+.words { font-family:Consolas,monospace; font-size:12px; color:var(--ink3); word-break:break-all; }
+.empty-ok { background:#f2fbf4; border:1px solid #cdeed6; color:#166534;
+  border-radius:10px; padding:12px 14px; font-size:14px; }
+.warn-box { background:#fffbeb; border:1px solid #fde68a; color:#92400e;
+  border-radius:10px; padding:12px 14px; font-size:14px; }
+pre.formula { background:#f6f7fb; border:1px solid var(--line); border-radius:8px;
+  padding:12px 14px; font-size:12.5px; line-height:1.9; overflow:auto;
+  font-family:Consolas,"Courier New",monospace; white-space:pre-wrap; }
+.methodology ul { font-size:13.5px; color:var(--ink2); padding-left:20px; }
+.disclaimer { font-size:12.5px; color:var(--ink3); background:#fbfbfd;
+  border:1px dashed var(--line2); border-radius:12px; padding:14px 16px; }
+.err { color:var(--bad); }
+
+/* ---------- 已有作品识别横幅（页面最顶部，必须最醒目） ---------- */
+.banner { display:flex; gap:14px; align-items:flex-start; border-radius:14px;
+  padding:16px 20px; margin-bottom:18px; border:2px solid; }
+.banner-icon { flex:0 0 auto; width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; }
+.banner-body { flex:1 1 auto; min-width:0; }
+.banner-kicker { font-size:11.5px; letter-spacing:.06em; font-weight:700;
+  text-transform:uppercase; opacity:.75; margin-bottom:4px; }
+.banner-title { font-size:19px; font-weight:800; line-height:1.4; }
+.banner-text { font-size:13.5px; margin-top:8px; line-height:1.75; }
+.banner-work { font-size:22px; font-weight:800; margin-top:6px; }
+.banner-author { font-size:14px; font-weight:600; opacity:.8; margin-left:10px; }
+.banner-era { font-size:13px; opacity:.7; margin-left:8px; }
+.banner-kv-row { display:flex; gap:22px; margin-top:8px; flex-wrap:wrap; }
+.banner-kv { font-size:12.5px; } .banner-kv span { opacity:.7; margin-right:6px; }
+.banner-kv b { font-size:15px; }
+
+.banner-danger { background:#fef2f2; border-color:#fca5a5; color:#7f1d1d; }
+.banner-danger .banner-icon { background:#dc2626; color:#fff; }
+.banner-warn { background:#fffbeb; border-color:#fcd34d; color:#78350f; }
+.banner-warn .banner-icon { background:#d97706; color:#fff; }
+.banner-ok { background:#f0fdf4; border-color:#86efac; color:#14532d; }
+.banner-ok .banner-icon { background:#16a34a; color:#fff; }
+.banner-info { background:#f8fafc; border-color:var(--line2); color:var(--ink2); }
+.banner-info .banner-icon { background:#94a3b8; color:#fff; }
+
+/* 通用声明：中性色但必须有足够存在感，不能被当成装饰略过 */
+.banner-disclaimer { background:#f1f5f9; border-color:#94a3b8; color:#1e293b; }
+.banner-disclaimer .banner-icon { background:#475569; color:#fff;
+  font-family:Georgia,serif; font-style:italic; font-size:19px; }
+.banner-disclaimer .banner-title { font-size:16px; }
+.banner-list { margin:8px 0 0; padding-left:20px; font-size:13px; line-height:1.8; }
+.banner-list li { margin-bottom:3px; }
+
+.panel-existing { border-color:#fca5a5; }
+.panel-existing h2 { color:#991b1b; }
+.ex-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px; margin:6px 0 14px; }
+.ex-grid > div { background:#f6f7fb; border-radius:8px; padding:8px 10px; }
+.ex-big { font-size:16px; font-weight:700; }
+.ex-ev { font-size:13.5px; margin:4px 0 10px; padding-left:20px; color:var(--ink2); }
+.ex-ev li { margin-bottom:5px; }
+.ex-note { font-size:13px; border-radius:8px; padding:9px 12px; margin-top:9px; line-height:1.7; }
+.ex-note-danger { background:#fef2f2; border-left:3px solid #dc2626; color:#7f1d1d; }
+.ex-note-warn { background:#fffbeb; border-left:3px solid #d97706; color:#78350f; }
+.ex-note-muted { background:#f8fafc; border-left:3px solid var(--line2); color:var(--ink3); font-size:12.5px; }
+.ex-note-muted ul { margin:4px 0 0; padding-left:18px; }
+
+/* ---------- 逻辑漏洞面板 ---------- */
+.panel-logic { border-color:#fca5a5; }
+.panel-logic h2 { color:#991b1b; }
+.logic-summary { font-size:14px; background:#fef2f2; border-left:3px solid #dc2626;
+  padding:9px 12px; border-radius:0 8px 8px 0; margin:8px 0 14px; color:#7f1d1d; }
+.hole { border:1px solid var(--line); border-left:4px solid #d97706;
+  border-radius:10px; padding:10px 13px; margin-bottom:9px; background:#fffdf8; }
+.hole.sev5 { border-left-color:#dc2626; background:#fff7f7; }
+.hole.sev4 { border-left-color:#ea580c; }
+.hole-head { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:5px; }
+.hole-no { width:20px; height:20px; border-radius:50%; background:#991b1b; color:#fff;
+  font-size:11.5px; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.hole-type { font-weight:700; font-size:14px; color:#991b1b; }
+.hole-sev { font-size:11.5px; color:var(--ink3); border:1px solid var(--line2);
+  border-radius:20px; padding:1px 8px; }
+.hole-why { font-size:13.5px; color:var(--ink2); margin-bottom:5px; }
+
+@media print {
+  body { background:#fff; font-size:11.5px; }
+  .panel,.hero { box-shadow:none; break-inside:avoid; }
+  details.card { break-inside:avoid; }
+  details.card:not([open]) .card-body { display:block !important; }
+  .doc { max-height:none; }
+  .table-wrap { max-height:none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+
+<div class="banner banner-disclaimer">
+  <div class="banner-icon">i</div>
+  <div class="banner-body">
+    <div class="banner-kicker">声明</div>
+    <div class="banner-title">本页面内容由 AI 生成，请自行判断是否采信</div>
+    <ul class="banner-list"><li>页面内容由 AI 生成，只做 <strong>AI 含量</strong>的判断，并提供修改意见。</li><li><strong>不保证结果一定准确</strong>。本工具给出的是概率性风险区间，不是鉴定结论；已知会低估经过人工改写的 AI 文本、也可能高估高度程式化的类型文。</li><li><strong>不评判作品好坏</strong>。风险分低只说明「不像机器写的」，不代表写得好；风险分高也不代表作品差——它只描述文体特征。</li><li><strong>是否相信页面内容，请用户自行判断。</strong></li></ul>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="hero-left">
+    <div class="eyebrow">网文 AI 痕迹检测 · 可解释报告</div>
+    <h1>示例-边界武侠</h1>
+    <div class="sub">
+      709 汉字 · 24 段 ·
+      37 句 · 生成于 2026-10-17 10:50:24 ·
+      引擎 v1.3.0 / 词表 v1.0.0
+    </div>
+    <div class="verdict v-verylow">
+      <div class="v-band">极低</div>
+      <div class="v-text">未检出系统性的 AI 痕迹。<strong>但这不等于证明为人写</strong>——本工具实测有过漏检：一份确认由 AI 生成的稿件也落在这一档。「极低」只表示「没有抓到证据」。</div>
+      <div class="v-interval">风险区间 <b>0 – 41</b>
+        <span class="hint">（同一份文本在不同检测器上的落点大概率落在这个带里）</span></div>
+    </div>
+  </div>
+  <div class="hero-right"><svg viewBox="0 0 360 210" class="gauge" role="img" aria-label="AI 痕迹风险 2 分"><path d="M 52.00 168.00 A 128.0 128.0 0 0 1 308.00 168.00" stroke="#eceef4" stroke-width="20" fill="none" stroke-linecap="round"/><path d="M 37.00 168.00 A 143.0 143.0 0 0 1 140.36 30.60" stroke="#9aa1b1" stroke-width="7" fill="none" stroke-linecap="butt" opacity="0.55"/><path d="M 52.00 168.00 A 128.0 128.0 0 0 1 52.27 159.72" stroke="#16a34a" stroke-width="20" fill="none" stroke-linecap="round"/><line x1="64.0" y1="168.0" x2="51.0" y2="168.0" stroke="#9aa1b1" stroke-width="1.5"/><text x="34.0" y="168.0" class="tick" text-anchor="middle">0</text><line x1="98.0" y1="86.0" x2="88.8" y2="76.8" stroke="#9aa1b1" stroke-width="1.5"/><text x="76.8" y="64.8" class="tick" text-anchor="middle">25</text><line x1="180.0" y1="52.0" x2="180.0" y2="39.0" stroke="#9aa1b1" stroke-width="1.5"/><text x="180.0" y="22.0" class="tick" text-anchor="middle">50</text><line x1="262.0" y1="86.0" x2="271.2" y2="76.8" stroke="#9aa1b1" stroke-width="1.5"/><text x="283.2" y="64.8" class="tick" text-anchor="middle">75</text><line x1="296.0" y1="168.0" x2="309.0" y2="168.0" stroke="#9aa1b1" stroke-width="1.5"/><text x="326.0" y="168.0" class="tick" text-anchor="middle">100</text><circle cx="37.0" cy="168.0" r="3.5" fill="#6b7280"/><circle cx="140.4" cy="30.6" r="3.5" fill="#6b7280"/><line x1="180.0" y1="168.0" x2="78.21" y2="161.40" stroke="#1f2430" stroke-width="3" stroke-linecap="round"/><circle cx="180.0" cy="168.0" r="7" fill="#1f2430"/><text x="180.0" y="126" class="gauge-num" text-anchor="middle" fill="#16a34a">2</text><text x="180.0" y="150" class="gauge-unit" text-anchor="middle">AI 痕迹风险分</text><text x="180.0" y="202" class="gauge-band" text-anchor="middle" fill="#16a34a">极低</text></svg></div>
+</header>
+
+<section class="grid2">
+  <div class="panel"><h2>风险贡献分布 <span class="hint">各柱之和 = 总分</span></h2><svg viewBox="0 0 436 444" class="radar" role="img" aria-label="各维度风险贡献的径向条形图（八根之和等于总风险分）"><defs><linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#dc2626"/></linearGradient><filter id="barGlow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#ea580c" flood-opacity="0.22"/></filter></defs><polygon points="218.0,144.0 263.3,162.7 282.0,208.0 263.3,253.3 218.0,272.0 172.7,253.3 154.0,208.0 172.7,162.7" fill="none" stroke="#eceef4" stroke-width="1"/><polygon points="218.0,124.0 277.4,148.6 302.0,208.0 277.4,267.4 218.0,292.0 158.6,267.4 134.0,208.0 158.6,148.6" fill="none" stroke="#eceef4" stroke-width="1"/><polygon points="218.0,104.0 291.5,134.5 322.0,208.0 291.5,281.5 218.0,312.0 144.5,281.5 114.0,208.0 144.5,134.5" fill="none" stroke="#eceef4" stroke-width="1"/><polygon points="218.0,84.0 305.7,120.3 342.0,208.0 305.7,295.7 218.0,332.0 130.3,295.7 94.0,208.0 130.3,120.3" fill="none" stroke="#eceef4" stroke-width="1"/><path d="M 176.61 91.11 A 124.00 124.00 0 0 1 259.39 91.11 L 232.69 166.52 A 44.00 44.00 0 0 0 203.31 166.52 Z" fill="#f6f7fa"/><path d="M 203.22 166.25 A 44.29 44.29 0 0 1 232.78 166.25 L 232.69 166.52 A 44.00 44.00 0 0 0 203.31 166.52 Z" fill="url(#barGrad)" opacity="0.64" filter="url(#barGlow)"/><text x="218.0" y="38.0" class="radar-label" text-anchor="middle">节奏与句法</text><text x="218.0" y="53.0" text-anchor="middle"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score">17%</tspan></text><text x="218.0" y="65.0" text-anchor="middle"><tspan class="axis-lbl">贡献</tspan><tspan dx="3" class="radar-pts-v">0.4</tspan></text><path d="M 271.38 96.08 A 124.00 124.00 0 0 1 329.92 154.62 L 257.71 189.06 A 44.00 44.00 0 0 0 236.94 168.29 Z" fill="#f6f7fa"/><text x="317.0" y="79.0" class="radar-label" text-anchor="start">用词与套话</text><text x="317.0" y="94.0" text-anchor="start"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><path d="M 334.89 166.61 A 124.00 124.00 0 0 1 334.89 249.39 L 259.48 222.69 A 44.00 44.00 0 0 0 259.48 193.31 Z" fill="#f6f7fa"/><text x="358.0" y="193.0" class="radar-label" text-anchor="start">修辞与模板</text><text x="358.0" y="208.0" text-anchor="start"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><path d="M 329.92 261.38 A 124.00 124.00 0 0 1 271.38 319.92 L 236.94 247.71 A 44.00 44.00 0 0 0 257.71 226.94 Z" fill="#f6f7fa"/><text x="317.0" y="292.0" class="radar-label" text-anchor="start">标点习惯</text><text x="317.0" y="307.0" text-anchor="start"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><path d="M 259.39 324.89 A 124.00 124.00 0 0 1 176.61 324.89 L 203.31 249.48 A 44.00 44.00 0 0 0 232.69 249.48 Z" fill="#f6f7fa"/><path d="M 233.14 250.76 A 45.36 45.36 0 0 1 202.86 250.76 L 203.31 249.48 A 44.00 44.00 0 0 0 232.69 249.48 Z" fill="url(#barGrad)" opacity="1.00" filter="url(#barGlow)"/><text x="218.0" y="333.0" class="radar-label" text-anchor="middle">对白质感</text><text x="218.0" y="348.0" text-anchor="middle"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score">83%</tspan></text><text x="218.0" y="360.0" text-anchor="middle"><tspan class="axis-lbl">贡献</tspan><tspan dx="3" class="radar-pts-v">1.7</tspan></text><path d="M 164.62 319.92 A 124.00 124.00 0 0 1 106.08 261.38 L 178.29 226.94 A 44.00 44.00 0 0 0 199.06 247.71 Z" fill="#f6f7fa"/><text x="119.0" y="292.0" class="radar-label" text-anchor="end">情绪与描写</text><text x="119.0" y="307.0" text-anchor="end"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><path d="M 101.11 249.39 A 124.00 124.00 0 0 1 101.11 166.61 L 176.52 193.31 A 44.00 44.00 0 0 0 176.52 222.69 Z" fill="#f6f7fa"/><text x="78.0" y="193.0" class="radar-label" text-anchor="end">结构与闭合</text><text x="78.0" y="208.0" text-anchor="end"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><path d="M 106.08 154.62 A 124.00 124.00 0 0 1 164.62 96.08 L 199.06 168.29 A 44.00 44.00 0 0 0 178.29 189.06 Z" fill="#f6f7fa"/><text x="119.0" y="79.0" class="radar-label" text-anchor="end">逻辑一致性</text><text x="119.0" y="94.0" text-anchor="end"><tspan class="axis-lbl">占比</tspan><tspan dx="3" class="radar-score radar-score-zero">—</tspan></text><text x="218.0" y="206.0" class="rose-total" text-anchor="middle">2</text><text x="218.0" y="223.0" class="rose-total-label" text-anchor="middle">总风险</text></svg><div class="radar-openness">人味证据强度 <b>0</b> / 100<span class="hint">（越高越像人写，作为减项抵扣风险分）</span></div><div class="radar-legend"><b>每根柱子 = 该维度贡献的风险分，八根之和 = 圆心总分</b>，与上方仪表盘同一把尺子。<br>柱子上的百分比 = 该维度在全部证据里的占比；没有柱子的维度就是 0 分。</div></div>
+  <div class="panel"><h2>体检表（客观指标 vs 人类基线）</h2>
+    <div class="table-wrap"><table class="quant"><thead><tr><th>指标</th><th>你的文本</th><th>人类基线（参考）</th></tr></thead><tbody><tr><td>正文字数（汉字）</td><td class="num ">709</td><td class="base"></td></tr><tr><td>段落数 / 句子数</td><td class="num ">24 / 37</td><td class="base"></td></tr><tr><td>对白字符占比</td><td class="num cell-bad">6.2%</td><td class="base">网文常见 20%–50%</td></tr><tr><td>平均句长（字）</td><td class="num cell-good">19.2</td><td class="base">网文常见 8–22</td></tr><tr><td>句长变异系数</td><td class="num cell-bad">0.415</td><td class="base">真人常见 ≥0.45</td></tr><tr><td>句长四分位距 IQR</td><td class="num cell-good">11.0</td><td class="base">真人常见 ≥6</td></tr><tr><td>短句占比（≤5 字）</td><td class="num cell-bad">2.7%</td><td class="base">真人常见 ≥8%</td></tr><tr><td>长句占比（≥40 字）</td><td class="num ">0.0%</td><td class="base">—</td></tr><tr><td>段长变异系数</td><td class="num cell-good">0.613</td><td class="base">真人常见 ≥0.35</td></tr><tr><td>单行短段占比</td><td class="num cell-good">41.7%</td><td class="base">网文常见 ≥25%</td></tr><tr><td>标点种类数</td><td class="num cell-good">6</td><td class="base">真人常见 ≥4</td></tr><tr><td>逗号+句号占比</td><td class="num cell-good">89.0%</td><td class="base">真人常见 ≤90%</td></tr><tr><td>半角标点混入</td><td class="num cell-bad">0.0%</td><td class="base">存在即为人味证据</td></tr><tr><td>文艺腔套话密度</td><td class="num cell-good">0.00</td><td class="base">真人常见 ≤1.2</td></tr><tr><td>抽象情绪词密度</td><td class="num cell-good">0.00</td><td class="base">真人常见 ≤6.0</td></tr><tr><td>通用身体反应密度</td><td class="num cell-good">0.00</td><td class="base">真人常见 ≤5.0</td></tr><tr><td>书面连接词密度</td><td class="num cell-good">0.00</td><td class="base">真人常见 ≤9.0</td></tr><tr><td>总结/升华词密度</td><td class="num cell-good">0.00</td><td class="base">真人常见 ≤1.5</td></tr><tr><td>对白标注种类占比</td><td class="num cell-bad">0.03</td><td class="base">真人常见 ≥0.40</td></tr><tr><td>人味词总密度</td><td class="num ">4.23</td><td class="base">越高越像人</td></tr></tbody></table></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>判定证据（按贡献排序）<span class="hint">共 3 条</span></h2>
+  <p class="hint">每条都给出：你的实测值、人类基线、为什么这条像 AI、以及具体改法。点击「定位」跳到正文对应位置。</p>
+  
+<details class="card sev2" id="ev0" open>
+  <summary>
+    <span class="sev-dot sev2"></span>
+    <span class="card-title">对白占比过低（全篇叙述）</span>
+    <span class="card-cat">对白质感</span>
+    <span class="card-score">0.38</span>
+  </summary>
+  <div class="card-body">
+    <div class="metrics">
+      <div><span class="k">你的文本</span><span class="v bad">0.062 对白字符占比</span></div>
+      <div><span class="k">人类基线</span><span class="v">0.12 对白字符占比</span></div>
+      <div><span class="k">超额倍数</span><span class="v bad">1.93×</span></div>
+      <div><span class="k">严重度</span><span class="v">轻微</span></div>
+    </div>
+    <div class="why"><div class="lbl">为什么这条像 AI</div><p>网文的推进力大量来自对白。AI 生成章节容易一路叙述，把该用对话交代的信息写成说明。这条权重低，因为确有以叙述为主的题材（如无限流、悬疑铺垫）。</p></div>
+    <div class="how"><div class="lbl">怎么改</div><p>把交代性叙述改成人物对话：让角色在说话中透露信息，而不是旁白说明。</p></div>
+    <div class="quotes"><div class="lbl">原文命中位置</div><div class="quote muted">（该项为分布型指标，无单点命中）</div></div>
+    <div class="calc">计分：2（严重度）× 0.55（可信度）× min(超额 1.93 倍, 3) × 命中饱和 → <b>0.38</b> 分</div>
+    <div class="note">注：低权重参考项，单独命中不构成嫌疑。</div>
+    
+  </div>
+</details>
+<details class="card sev4" id="ev1" open>
+  <summary>
+    <span class="sev-dot sev4"></span>
+    <span class="card-title">句子长度过于均匀（节奏没有起伏）</span>
+    <span class="card-cat">节奏与句法</span>
+    <span class="card-score">0.06</span>
+  </summary>
+  <div class="card-body">
+    <div class="metrics">
+      <div><span class="k">你的文本</span><span class="v bad">0.415 变异系数</span></div>
+      <div><span class="k">人类基线</span><span class="v">0.45 变异系数</span></div>
+      <div><span class="k">超额倍数</span><span class="v bad">1.08×</span></div>
+      <div><span class="k">严重度</span><span class="v">显著</span></div>
+    </div>
+    <div class="why"><div class="lbl">为什么这条像 AI</div><p>这是 AI 文本最稳定的指纹。人类写作时，情绪一上来会突然甩出一句两字短句，交代环境时又会写一句四十字长句——句长忽长忽短，变异系数（标准差/均值）通常大于 0.5。语言模型逐步挑高概率词，句长被"平均值"拉住，落在一个很窄的带子里，变异系数常常只有 0.25–0.45。通俗讲：<strong>读起来每句话都差不多长，像用尺子量过的。</strong></p></div>
+    <div class="how"><div class="lbl">怎么改</div><p>① 找连续 3 句长度接近的地方，把中间那句砍到 4 字以内或拉长到 30 字以上；② 在情绪爆发点插入独立成段的极短句（如「他愣住了。」单独一段）；③ 交代场景时允许写一个长复句，不要每句都收在同一个呼吸长度上。目标是把变异系数拉回 0.55 以上。</p></div>
+    <div class="quotes"><div class="lbl">原文命中位置</div><div class="quote muted">（该项为分布型指标，无单点命中）</div></div>
+    <div class="calc">计分：4（严重度）× 0.6（可信度）× min(超额 1.08 倍, 3) × 命中饱和 → <b>0.06</b> 分</div>
+    <div class="note">注：这不是「文笔好坏」问题，是节奏分布问题。</div>
+    
+  </div>
+</details>
+<details class="card sev3" id="ev2" open>
+  <summary>
+    <span class="sev-dot sev3"></span>
+    <span class="card-title">小句（逗号分隔的片段）长度同样均匀</span>
+    <span class="card-cat">节奏与句法</span>
+    <span class="card-score">0.02</span>
+  </summary>
+  <div class="card-body">
+    <div class="metrics">
+      <div><span class="k">你的文本</span><span class="v bad">0.481 变异系数</span></div>
+      <div><span class="k">人类基线</span><span class="v">0.5 变异系数</span></div>
+      <div><span class="k">超额倍数</span><span class="v bad">1.04×</span></div>
+      <div><span class="k">严重度</span><span class="v">中等</span></div>
+    </div>
+    <div class="why"><div class="lbl">为什么这条像 AI</div><p>比句长更细一层：把逗号也当作断点后，每个小句的长度分布。AI 常写出"四字，四字，五字，四字"这种均匀推进的节奏，人写则会"他，一个在工地搬了七年砖的人，忽然有了钱"——小句长度极不均。这条命中说明均匀性不只停在句子层面，已经渗进了词组层面。</p></div>
+    <div class="how"><div class="lbl">怎么改</div><p>在逗号链里插入一个明显更长或更短的小句，打乱等长推进。</p></div>
+    <div class="quotes"><div class="lbl">原文命中位置</div><div class="quote muted">（该项为分布型指标，无单点命中）</div></div>
+    <div class="calc">计分：3（严重度）× 0.6（可信度）× min(超额 1.04 倍, 3) × 命中饱和 → <b>0.02</b> 分</div>
+    
+    
+  </div>
+</details>
+</section>
+
+<section class="panel">
+  <h2>正文标注视图<span class="hint">下划线 = 被判定为 AI 痕迹的位置，颜色深浅代表严重度</span></h2>
+  <div class="legend">
+    <span><i class="sev1"></i>提示</span><span><i class="sev2"></i>轻微</span>
+    <span><i class="sev3"></i>中等</span><span><i class="sev4"></i>显著</span>
+    <span><i class="sev5"></i>强烈</span>
+  </div>
+  <div class="doc">夜里下了雨，早上起来院子里的青石板是湿的。<br><br>沈砚把剑从鞘里抽出来，用一块旧布慢慢擦。布是粗麻的，擦在剑身上有点涩，来回几遍，锈斑才下去一层。这把剑跟了他十一年，剑格上磕了个缺口，是当年在洛水边上跟人换命的时候留下的。<br><br>擦完他把剑收回鞘，插在腰后，出门。<br><br>巷子口卖胡饼的老头已经在生火了，见他出来，抬了抬下巴：“今天早啊。”<br><br>“嗯。”沈砚站住，掏钱买了两个，热的，用油纸包着，烫手。<br><br>他一边吃一边往城门走。胡饼里放了椒盐，咬下去满嘴的油香，芝麻掉在衣襟上，他拍了拍，没拍干净。<br><br>城门刚开，守城的兵卒还在打哈欠。沈砚出了城，沿着官道走了三里，拐进左边一条土路。路两边是荒了的田，草长得齐腰高，露水打湿了他的裤脚，凉。<br><br>到地方的时候太阳刚照过树梢。<br><br>那是一处塌了半边的土地庙，供桌上的土积了厚厚一层。沈砚蹲下去，在供桌底下摸了摸，摸到一块松动的砖，抽出来，下面是个油布包。<br><br>他把油布包拿出来，拍了拍上面的土，打开。<br><br>里面是三封信，一个铜牌，还有半块玉。<br><br>沈砚把铜牌拿起来看。铜牌正面刻着一个“漕”字，背面是一串编号，字口很深，是官造的东西。他用拇指把编号那面的锈搓掉，凑着光看了看，眉头皱了起来。<br><br>编号是“甲字七十三”。<br><br>他把铜牌放回油布包里，重新包好，塞回砖下，把砖按回去，用脚把土蹭平。做完这些他站起来，环顾了一圈。<br><br>庙外的草在风里晃，没有别的声音。<br><br>他走出庙门，在门槛上坐下，从怀里摸出刚才剩下的一个胡饼，慢慢吃。饼凉了，有点硬，他嚼得很慢。<br><br>远处有鸟叫。<br><br>沈砚吃完饼，把油纸叠好揣进怀里，站起来，往官道上走。走到一半他停了停，回头看了一眼那座土地庙。<br><br>“甲字七十三……”他低声念了一遍，像是在记，又像是在确认什么。<br><br>然后他转过身，继续走。裤脚上的水已经干了一半，留下一圈深色的印子。<br><br>回到城门口的时候，那个守城的兵卒换了一个人，年纪更小，看见他腰后的剑，多看了两眼。<br><br>沈砚没理他，径直进城。<br><br>巷子口的老头还在，火已经灭了，胡饼卖出大半。老头见他回来，笑了一下：“办完事了？”<br><br>“没办。”沈砚说，“还得去一趟洛水。”<br></div>
+</section>
+
+<section class="panel">
+  <h2>修改处方（按性价比排序）</h2>
+  <p class="hint">排序依据 = 该条能省下的风险分 ÷ 改动成本。先改前三条，通常就能降一个档位。</p>
+  
+<div class="presc">
+  <div class="presc-head"><span class="rank">1</span>
+    <span class="presc-title">对白占比过低（全篇叙述）</span>
+    <span class="presc-meta">省 0.4 分 · 改动成本 中</span>
+  </div>
+  <div class="presc-body">把交代性叙述改成人物对话：让角色在说话中透露信息，而不是旁白说明。</div>
+</div>
+<div class="presc">
+  <div class="presc-head"><span class="rank">2</span>
+    <span class="presc-title">句子长度过于均匀（节奏没有起伏）</span>
+    <span class="presc-meta">省 0.1 分 · 改动成本 高</span>
+  </div>
+  <div class="presc-body">① 找连续 3 句长度接近的地方，把中间那句砍到 4 字以内或拉长到 30 字以上；② 在情绪爆发点插入独立成段的极短句（如「他愣住了。」单独一段）；③ 交代场景时允许写一个长复句，不要每句都收在同一个呼吸长度上。目标是把变异系数拉回 0.55 以上。</div>
+</div>
+<div class="presc">
+  <div class="presc-head"><span class="rank">3</span>
+    <span class="presc-title">小句（逗号分隔的片段）长度同样均匀</span>
+    <span class="presc-meta">省 0.0 分 · 改动成本 高</span>
+  </div>
+  <div class="presc-body">在逗号链里插入一个明显更长或更短的小句，打乱等长推进。</div>
+</div>
+</section>
+
+<section class="panel">
+  <h2>误判对冲：支持「这是人写的」的证据</h2>
+  <p class="hint">AI 检测最大的问题是只找"像 AI"的证据，不找反证。这一节专门列反证。</p>
+  <div class="score-line">人味证据强度：<b>0</b>/100</div><ul class="human-list"><li><b>犹豫、不确定的表述</b>：共 1 次（1.41/千字）<div class="words">那个×1</div></li><li><b>语气助词</b>：共 2 次（2.82/千字）<div class="words">啊×1、哈×1</div></li></ul>
+</section>
+
+<section class="panel">
+  <h2>如果被平台判定，可以用这些论据申诉</h2>
+  <ol><li>本次送检文本共 709 个汉字，24 段，37 句，属片段样本（低于单章规模），单凭此样本不宜对整部作品下结论。</li><li>检出证据 3 条，其中权重较高（≥2 分）的 0 条；结论区间为 0–41 分，即本工具自己承认存在 41 分的不确定度。</li><li>单条证据的敏感度：剔除贡献最大的「对白占比过低（全篇叙述）」后，风险分由 2 降至 0（单项影响 2 分）——说明结论对单条特征高度敏感。</li><li><strong>方法论主张</strong>：现有 AI 检测器普遍基于困惑度与突发性，其输出是概率性的，不构成对创作主体的认定。本工具的结论同样只表述为「风险区间」，若平台以单一分数作为处置依据，请要求其公开判定阈值、检测文本范围与复核机制。</li></ol>
+</section>
+
+<section class="panel">
+  <h2>结论的不确定性与已知失效场景</h2>
+  <ul><li>样本 709 字，低于 1000 字。结论区间已强制放宽 ±15 分，请勿单独作为判断依据。建议至少提供 2000 字（单章规模）再判定。</li><li>未识别出题材，未启用题材基线放宽。若这是系统流/古风等高度程式化题材，本工具可能偏严，请参考「误判对冲」一节的说明。</li><li><strong>若文本经过人工改写或 AI 辅助润色，本工具倾向于低估</strong>——改写会稀释典型痕迹，但不会把它变成人写。</li><li><strong>高度程式化的题材</strong>（系统流、签到流、战神文）人写也会出现句式重复，本工具已按题材放宽基线，但无法完全排除误判。</li><li>因样本不足而<strong>未参与评分</strong>的规则：LEX_CHAR_TTR：样本不足 1200 字，用字丰富度指标不可靠；PUNCT_ENTROPY：标点分布需 ≥1200 字且 ≥4 类标点（当前 709 字 / 6 类），样本不足不评分；PUNCT_CONCENTRATION：标点分布需 ≥1200 字且 ≥4 类标点（当前 709 字 / 6 类），样本不足不评分；DLG_TAG_VARIETY：说话人标注需 ≥8 次（当前 1 次），样本不足；DLG_FLUENCY：对白占比低于 10%，对白长度样本不足；EMO_SENSORY：五感占比需 ≥2000 字才稳定（当前 709 字）；OPN_NOISE：写作噪声需 ≥8 处才构成统计现象（当前 0 处），零星几处无法与人名/固定搭配区分，不纳入。这些项目缺失会让结论偏离中性，不代表它们正常。</li></ul>
+</section>
+
+<section class="panel methodology">
+  <h2>方法学透明说明</h2>
+  
+<h3>计分公式（全部公开）</h3>
+<pre class="formula">单条规则得分 = 严重度(1-5) × 可信度(0-1) × 档位系数 × [ 超额分 + 极端加成 ] × (1 - e^(-命中次数/1.5))
+               档位系数 = A级 2.0 ｜ B级 1.0 ｜ C级 0.4          ← v1.3 新增
+               超额分   = min(超额倍数 - 1, 3)
+               极端加成 = min(0.8 × log2(超额倍数 / 4), 1.5)  （超额 >4 倍时）
+
+分类自身分   = 100 × (1 - e^(-Σ规则得分 / 该分类归一常数))   ← 仅用于「人味证据」的抵扣量
+证据多样性   = 1 + 0.20 × min(有实质贡献(≥1.5分)的维度数 - 2, 3)
+总风险       = 100 × (1 - e^(-证据总分 × 证据多样性 / 22)) - 0.30 × 人味证据强度
+区间         = 风险 ± (证据分散惩罚 5-14 + 样本长度惩罚 0-12 + 短样本放宽 0-15)
+档位         = &lt;18 极低 ｜ &lt;36 偏低 ｜ &lt;55 中等 ｜ &lt;72 偏高 ｜ ≥72 极高</pre>
+<h3>「档位系数」是什么（v1.3）</h3>
+<p class="hint">
+早期所有规则的有效权重只差 4.9 倍，而且<b>排错了</b>——实测会误报的启发式
+（句长均匀度，权重 2.40）反而高于已证实的强信号（比喻模板，权重 1.98）。
+结果是一条"套话密度是基线 19 倍"的压倒性证据，被一堆弱启发式<b>摊平</b>。<br>
+现在按<b>实测区分度</b>分三档：
+</p>
+<table class="quant"><thead><tr><th>档位</th><th>系数</th><th>判据</th><th>典型规则</th></tr></thead><tbody>
+<tr><td><b>A 级</b></td><td>×2.0</td><td>实测能区分人写与 AI，几乎可作确定性证据</td>
+    <td>文艺腔套话、逐字重复、总结词、对偶模板、比喻模板、段末升华</td></tr>
+<tr><td><b>B 级</b></td><td>×1.0</td><td>有效性中等，需与其它信号并发</td>
+    <td>情绪命名、身体库存、标注单调、对白乒乓、五感偏视觉</td></tr>
+<tr><td><b>C 级</b></td><td>×0.4</td><td>受长度/题材干扰大，实测出现过误报或零区分度</td>
+    <td>句长均匀度、段长整齐、单行段、标点熵、用字丰富度</td></tr>
+</tbody></table>
+<p class="hint">
+权重跨度因此从 <b>4.9 倍扩大到 24 倍</b>：一条 A 级强信号（8.80）现在是一条
+C 级启发式（0.36）的 <b>24 倍</b>，不会再被摊平。
+所有分档依据都写在 <code>rules.py</code> 的 <code>TIER_MAP</code> 注释里，可逐条复核。
+</p>
+<h3>「极端加成」是什么（v1.3）</h3>
+<p class="hint">
+原来的封顶会让「套话密度是基线的 4 倍」和「19 倍」拿到<b>同一个分数</b>——
+而后者是压倒性证据：没有人会自然地写出 19 倍的套话密度。
+所以对<b>超额超过 4 倍</b>的信号额外给对数加成（封顶 +1.5，即最多比原分多 50%）。<br>
+用对数而非线性，是为了让加成随倍数<b>缓慢</b>上升，避免极端值再次主导结论。
+加成<b>只影响本次计分</b>，不改规则的严重度、可信度与基线——<b>不会污染判断力</b>。
+</p>
+<h3>为什么要有「证据多样性」这一项</h3>
+<p class="hint">
+实测发现：只看证据总量会把两种很不一样的情况算成同分——
+「3 条证据全挤在同一个维度」和「8 条证据横跨 4–5 个维度」，两者证据总分都约 25 分。
+但后者可信得多：不同维度的特征是**互相独立**的，同时出现才说明"系统性"；
+前者可能只是某一种写作习惯被反复命中。<br>
+加上多样性加成后：同为 25 分的两份文本，横跨 2 个维度得 <b>68 分</b>（偏高），
+横跨 4 个维度得 <b>80 分</b>（极高）。<b>这一项只加成、不削减</b>，
+单一维度命中的文本分数不变。
+</p>
+<h3>各维度贡献（相加 = 总分）</h3>
+<table class="quant"><thead><tr><th>分类</th><th>贡献分</th><th>占证据</th><th>测什么</th></tr></thead>
+<tbody><tr><td>节奏与句法</td><td class="num">0.4</td><td class="num">17%</td><td>句长与段长的起伏程度。真人忽长忽短，AI 被均值拉住。</td></tr><tr><td>用词与套话</td><td class="num">0.0</td><td class="num">0%</td><td>套话、抽象情绪词、通用身体反应、书面连接词的密度。</td></tr><tr><td>修辞与模板</td><td class="num">0.0</td><td class="num">0%</td><td>「不是A而是B」「像……一样」这类句式模板的复用频率。</td></tr><tr><td>标点习惯</td><td class="num">0.0</td><td class="num">0%</td><td>标点种类分布与规范性。半角标点是强人味证据。</td></tr><tr><td>对白质感</td><td class="num">1.7</td><td class="num">83%</td><td>对白占比、说话人标注多样性、对白是否像真人说话。</td></tr><tr><td>情绪与描写</td><td class="num">0.0</td><td class="num">0%</td><td>抽象命名情绪 vs 具体生理反应；五感是否只剩视觉。</td></tr><tr><td>结构与闭合</td><td class="num">0.0</td><td class="num">0%</td><td>段落闭合习惯：是否段段收尾、句句升华。</td></tr><tr><td>逻辑一致性</td><td class="num">0.0</td><td class="num">0%</td><td>**由模型判断的逻辑漏洞**（自相矛盾/答非所问/语义跳跃）。这是唯一不靠统计的分类——逻辑崩了，文风再像人也没用。权重高于所有文体类规则。</td></tr></tbody></table>
+<h3>本工具明确不做什么</h3>
+<ul>
+<li>不给"AI 生成率"这类确定语气的数字，只给风险区间与档位。</li>
+<li>不提供整章一键改写。给出的只是改法说明与示范，因为洗稿是用 AI 掩盖 AI，改完更像机器。</li>
+<li>不声称"证明"。所有结论都是概率性推断，附误差与失效场景。</li>
+</ul>
+</section>
+
+<footer class="disclaimer">
+  <b>免责声明</b>
+  <ul style="margin:6px 0 0;padding-left:20px;">
+    <li>页面内容由 AI 生成，只做 <b>AI 含量</b>的判断，并提供修改意见。</li>
+    <li><b>不保证结果一定准确。</b>本报告基于可观测的文体统计特征做概率性推断，
+      输出的是风险区间而非鉴定结论；已知会低估经过人工改写的 AI 文本，
+      也可能高估系统流等高度程式化的类型文。</li>
+    <li><b>不评判作品好坏。</b>风险分低只说明「文体上不像机器写的」，不代表写得好；
+      风险分高也不代表作品差，它只描述文体特征。</li>
+    <li><b>是否相信页面内容，请用户自行判断。</b>本工具无法获取任何模型的服务端信息，
+      也无法证明文本由谁创作；不构成法律意义上的鉴定结论，不得作为认定创作主体的唯一依据。</li>
+  </ul>
+</footer>
+
+</div>
+<script type="application/json" id="report-data">{"risk": 2.06, "band": "极低", "findings": [{"id": "DLG_RATIO_LOW", "contrib": 0.379}, {"id": "RHY_SENT_CV", "contrib": 0.059}, {"id": "RHY_CLAUSE_CV", "contrib": 0.021}]}</script>
+<script>
+// 点击证据卡里的「定位」时，高亮正文中的对应片段
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('a.jump');
+  if (!a) return;
+  var id = a.getAttribute('href').slice(1);
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.transition = 'background .2s';
+  el.style.background = '#fffbdc';
+  setTimeout(function () { el.style.background = ''; }, 1600);
+});
+</script>
+</body>
+</html>

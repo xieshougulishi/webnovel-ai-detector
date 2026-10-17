@@ -1,0 +1,14 @@
+{
+  "files": [
+    "scripts/analyze.py",
+    "scripts/textlib.py",
+    "scripts/features.py",
+    "scripts/rules.py",
+    "scripts/render_html.py",
+    "scripts/render_md.py",
+    "scripts/existing_work.py",
+    "scripts/coherence.py",
+    "data/lexicon_ai.json",
+    "bridge.py"
+  ]
+}
