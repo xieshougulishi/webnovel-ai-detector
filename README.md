@@ -2,7 +2,7 @@
 
 > 检测中文网文的 AI 含量，并**逐条列出判定原因**——不是只丢给你一个分数。
 
-**网页版：<https://xieshougulishi.github.io/webnovel-ai-detector/>**　·　**Skill：[skill/](skill/)**（可装进 Claude Code、DSH 等）
+**网页版：<https://xieshougulishi.github.io/webnovel-ai-detector/>**　·　**Skill：[skill/SKILL.md](skill/SKILL.md)**（可装进 Claude Code、DSH 等）
 
 一个可解释的 AI 痕迹检测工具。对比"朱雀"这类黑箱检测器：它给你一个 87% 就结束了，而这个工具会告诉你**哪一条命中、落在原文第几个字、实测值和人类基线差多少、为什么算异常、具体怎么改**。
 
@@ -46,9 +46,13 @@
 
 ### 用法二：装成 Agent Skill（功能完整）
 
-仓库里的 [`skill/`](skill/) 目录就是完整的技能本体。
+技能定义在 [`skill/SKILL.md`](skill/SKILL.md)，整个 `skill/` 目录就是技能本体。
 
-把整个 `skill/` 文件夹复制到你的 skills 目录：
+**第一步：把仓库下载下来**
+
+点页面右上角绿色的 **`Code`** 按钮 → **`Download ZIP`**，解压后进入 `skill/` 目录。
+
+**第二步：把 `skill/` 整个文件夹复制到你的 skills 目录**
 
 ```bash
 # DSH

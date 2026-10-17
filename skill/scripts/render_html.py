@@ -190,9 +190,13 @@ def svg_category_chart(res: Dict[str, Any]) -> str:
             parts.append(f'<path d="{wedge(a0, a1, r1)}" fill="url(#barGrad)" '
                          f'opacity="{opac:.2f}" filter="url(#barGlow)"/>')
 
-        # 标签：分类名 / 占比 / 贡献，三行都带小标题，避免"8% 和 7.1 分是什么"看不懂。
-        # 排版按扇区方位走：上半圈三行往上叠（否则压到图形上），下半圈往下叠，
-        # 左右两侧以扇区中点垂直居中。
+        # 标签三行：分类名 / 占满分% / 证据份额%
+        #
+        # **主数字必须是「占满分的百分比」，不能是「占证据的百分比」**：
+        # 柱子长度 = 贡献分/100，所以标签写 78.9% 才和柱子对得上。
+        # 早版本这里写的是证据份额 92%（= 78.9 / 86），和柱子长度不一致，
+        # 读图的人会以为"92% 那么长，怎么只画到这里"。
+        # 证据份额降级为第三行的小字，它回答的是另一个问题：这份证据里它占多少。
         lx, ly = cx + (rmax + 16) * math.cos(c), cy + (rmax + 16) * math.sin(c)
         anchor = "middle"
         if math.cos(c) > 0.25:
@@ -205,16 +209,18 @@ def svg_category_chart(res: Dict[str, Any]) -> str:
 
         parts.append(f'<text x="{lx:.1f}" y="{y0:.1f}" class="radar-label" '
                      f'text-anchor="{anchor}">{esc(CATEGORY_CN[a])}</text>')
-        shown = f"{shares[a]*100:.0f}%" if (not zero and shares[a] >= 0.005) else "—"
+        # 第二行：占满分（与柱子长度一致）
+        shown = f"{value:.1f}%" if not zero else "—"
         parts.append(
             f'<text x="{lx:.1f}" y="{y0 + 15:.1f}" text-anchor="{anchor}">'
-            f'<tspan class="axis-lbl">占比</tspan>'
+            f'<tspan class="axis-lbl">占满分</tspan>'
             f'<tspan dx="3" class="{cls}">{shown}</tspan></text>')
+        # 第三行：证据份额（小字，回答"它在这份证据里占多少"）
         if not zero:
             parts.append(
                 f'<text x="{lx:.1f}" y="{y0 + 27:.1f}" text-anchor="{anchor}">'
-                f'<tspan class="axis-lbl">贡献</tspan>'
-                f'<tspan dx="3" class="radar-pts-v">{value:.1f}</tspan></text>')
+                f'<tspan class="axis-lbl">证据</tspan>'
+                f'<tspan dx="3" class="radar-pts-v">{shares[a]*100:.0f}%</tspan></text>')
 
     # 圆心：总分
     parts.append(f'<text x="{cx}" y="{cy - 2:.1f}" class="rose-total" '
@@ -228,8 +234,9 @@ def svg_category_chart(res: Dict[str, Any]) -> str:
                  f'<span class="hint">（越高越像人写，作为减项抵扣风险分）</span></div>')
     parts.append(
         '<div class="radar-legend">'
-        '<b>每根柱子 = 该维度贡献的风险分，八根之和 = 圆心总分</b>，与上方仪表盘同一把尺子。<br>'
-        '柱子上的百分比 = 该维度在全部证据里的占比；没有柱子的维度就是 0 分。'
+        '<b>柱子长度 = 该维度贡献的风险分（满分 100），八根之和 = 圆心总分</b>，与上方仪表盘同一把尺子。<br>'
+        '<b>占满分</b>＝它占 100 分的比例（柱子多长就是这个数）；'
+        '<b>证据</b>＝它在这份文本的全部证据里占的份额。没有柱子的维度就是 0 分。'
         '</div>')
     return "".join(parts)
 
